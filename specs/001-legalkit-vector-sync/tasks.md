@@ -131,7 +131,7 @@
 
 **Purpose**: Final validation and documentation
 
-- [ ] T026 [P] Update troubleshooting.md if any issues encountered during implementation
+- [x] T026 [P] Update troubleshooting.md if any issues encountered during implementation
 - [ ] T027 Run quickstart.md validation: test PISTE OAuth with curl, test article retrieval, verify full pipeline
 - [ ] T028 Verify all indexes created on REF_codes_legifrance (idEli, etat, cid, id_legifrance, code)
 - [ ] T029 Final sync validation: trigger full sync of all 7 priority codes, verify CS-003 (99.5% embeddings valid)

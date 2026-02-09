@@ -165,7 +165,7 @@ L'orchestrateur (Claude) NE DOIT PAS écrire de XanoScript directement - il dél
 ### Ontologie Computationnelle
 
 L'ontologie `marianne_computational_ontology` sur Grafo (ID: `b45711d8-e2a6-4e9e-9091-4c6b6231b764`) DOIT être consultée avant toute modification architecturale. Elle modélise :
-- Entités : Utilisateur, Commune, ConversationIA, MessageIA, ArticleLegifrance, OutilMCP, ServeurMCP, APIEndpoint
-- Relations : appartientA, initie, contient, expose, interroge, consomme, invoque
+- Entités : Utilisateur, Commune, ConversationIA, MessageIA, ArticleLegifrance, ArticleChunk, OutilMCP, ServeurMCP, APIEndpoint, CodeJuridiquePISTE, OrchestreurClientSide, SyncExecution, TemplateDocumentAdministratif, TemplatePlaceholder, DocumentGenere, CategorieTemplate, SessionGenerationDocument
+- Relations : appartientA, initie, contient, expose, interroge, consomme, invoque, genereDepuis, generePar, contientPlaceholders, classeeDans, collecteDonneesPour, CHUNKED_FROM, synchronise, produit, utiliseTemplate, produitDocument, demarre
 
-**Version** : 1.0.0 | **Ratifiée** : 2026-01-24 | **Dernière modification** : 2026-01-24
+**Version** : 1.2.0 | **Ratifiée** : 2026-01-24 | **Dernière modification** : 2026-02-07

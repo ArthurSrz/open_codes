@@ -1,0 +1,416 @@
+{
+  "arrete_voirie": {
+    "nom": "Arrêté de voirie",
+    "categorie": "arrete_municipal",
+    "description": "Arrêté municipal réglementant temporairement la circulation et le stationnement pour travaux sur la voie publique",
+    "references_legales": [
+      "L.2213-1 CGCT",
+      "L.2213-6 CGCT",
+      "R.411-5 Code de la route"
+    ],
+    "placeholders": [
+      {
+        "id": "commune_nom",
+        "label": "Nom de la commune",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "departement_nom",
+        "label": "Nom du département",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "numero_arrete",
+        "label": "Numéro de l'arrêté",
+        "type": "text",
+        "required": true,
+        "example": "2026-ARR-042"
+      },
+      {
+        "id": "nature_travaux",
+        "label": "Nature des travaux",
+        "type": "text",
+        "required": true,
+        "example": "réfection de la chaussée",
+        "question_chatbot": "Quelle est la nature des travaux à réaliser ?"
+      },
+      {
+        "id": "rue_nom",
+        "label": "Nom de la rue concernée",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Sur quelle rue les travaux auront-ils lieu ?"
+      },
+      {
+        "id": "numero_debut",
+        "label": "Numéro de début de la zone",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "À quel numéro commence la zone de travaux ?"
+      },
+      {
+        "id": "numero_fin",
+        "label": "Numéro de fin de la zone",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "À quel numéro se termine la zone de travaux ?"
+      },
+      {
+        "id": "demandeur_nom",
+        "label": "Nom du demandeur",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Qui est le demandeur des travaux (entreprise ou particulier) ?"
+      },
+      {
+        "id": "date_demande",
+        "label": "Date de la demande",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "Quelle est la date de la demande ?"
+      },
+      {
+        "id": "date_debut",
+        "label": "Date de début des travaux",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "Quelle est la date de début des travaux ?"
+      },
+      {
+        "id": "date_fin",
+        "label": "Date de fin des travaux",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "Quelle est la date prévue de fin des travaux ?"
+      },
+      {
+        "id": "type_restriction",
+        "label": "Type de restriction de circulation",
+        "type": "enum",
+        "required": true,
+        "options": [
+          "interrompue",
+          "alternée",
+          "réduite à une voie",
+          "déviée"
+        ],
+        "question_chatbot": "Quel type de restriction de circulation souhaitez-vous mettre en place ?"
+      },
+      {
+        "id": "itineraire_deviation",
+        "label": "Itinéraire de déviation",
+        "type": "text",
+        "required": false,
+        "question_chatbot": "Quel est l'itinéraire de déviation prévu (si applicable) ?"
+      },
+      {
+        "id": "zone_stationnement_interdit",
+        "label": "Zone de stationnement interdit",
+        "type": "text",
+        "required": false,
+        "default": "les abords immédiats du chantier"
+      },
+      {
+        "id": "vitesse_limitee",
+        "label": "Vitesse limitée (km/h)",
+        "type": "number",
+        "required": false,
+        "default": "30"
+      },
+      {
+        "id": "entreprise_nom",
+        "label": "Nom de l'entreprise chargée de la signalisation",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quelle entreprise sera chargée de la signalisation ?"
+      },
+      {
+        "id": "tribunal_administratif",
+        "label": "Tribunal administratif compétent",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "date_signature",
+        "label": "Date de signature",
+        "type": "date",
+        "required": true,
+        "auto_fill": true,
+        "source": "today"
+      },
+      {
+        "id": "maire_nom",
+        "label": "Nom du maire",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      }
+    ]
+  },
+  "arrete_police_maire": {
+    "nom": "Arrêté de police du maire",
+    "categorie": "arrete_municipal",
+    "description": "Arrêté municipal pris au titre des pouvoirs de police générale du maire pour assurer l'ordre, la sûreté, la sécurité et la salubrité publiques",
+    "references_legales": [
+      "L.2212-1 CGCT",
+      "L.2212-2 CGCT",
+      "R.610-5 Code pénal"
+    ],
+    "placeholders": [
+      {
+        "id": "commune_nom",
+        "label": "Nom de la commune",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "departement_nom",
+        "label": "Nom du département",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "numero_arrete",
+        "label": "Numéro de l'arrêté",
+        "type": "text",
+        "required": true,
+        "example": "2026-POL-015"
+      },
+      {
+        "id": "objet_arrete",
+        "label": "Objet de l'arrêté",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quel est l'objet de cet arrêté de police ? (ex: réglementation du bruit, interdiction de circulation, etc.)"
+      },
+      {
+        "id": "motif_principal",
+        "label": "Motif principal",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quel est le motif principal justifiant cet arrêté ?"
+      },
+      {
+        "id": "risque_ou_nuisance",
+        "label": "Risque ou nuisance à prévenir",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quel risque ou quelle nuisance cet arrêté vise-t-il à prévenir ?"
+      },
+      {
+        "id": "justification_complementaire",
+        "label": "Justification complémentaire",
+        "type": "text",
+        "required": false,
+        "question_chatbot": "Y a-t-il une justification complémentaire à ajouter ?"
+      },
+      {
+        "id": "mesures_prescrites",
+        "label": "Mesures prescrites",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quelles sont les mesures prescrites par cet arrêté ? (décrivez précisément les interdictions ou obligations)"
+      },
+      {
+        "id": "perimetre_application",
+        "label": "Périmètre d'application",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quel est le périmètre géographique d'application ?"
+      },
+      {
+        "id": "date_debut",
+        "label": "Date d'entrée en vigueur",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "À quelle date l'arrêté entre-t-il en vigueur ?"
+      },
+      {
+        "id": "date_fin",
+        "label": "Date de fin de validité",
+        "type": "date",
+        "required": false,
+        "question_chatbot": "Quelle est la date de fin de validité ? (laisser vide si permanent)"
+      },
+      {
+        "id": "tribunal_administratif",
+        "label": "Tribunal administratif compétent",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "date_signature",
+        "label": "Date de signature",
+        "type": "date",
+        "required": true,
+        "auto_fill": true,
+        "source": "today"
+      },
+      {
+        "id": "maire_nom",
+        "label": "Nom du maire",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      }
+    ]
+  },
+  "permis_stationnement": {
+    "nom": "Permis de stationnement",
+    "categorie": "autorisation",
+    "description": "Autorisation d'occupation temporaire du domaine public communal (terrasse, échafaudage, étalage, etc.)",
+    "references_legales": [
+      "L.2213-1 CGCT",
+      "L.2213-6 CGCT",
+      "L.2122-1 CGPPP"
+    ],
+    "placeholders": [
+      {
+        "id": "commune_nom",
+        "label": "Nom de la commune",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "departement_nom",
+        "label": "Nom du département",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "numero_arrete",
+        "label": "Numéro de l'arrêté",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "demandeur_nom",
+        "label": "Nom du demandeur",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quel est le nom du demandeur (personne ou entreprise) ?"
+      },
+      {
+        "id": "demandeur_adresse",
+        "label": "Adresse du demandeur",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quelle est l'adresse complète du demandeur ?"
+      },
+      {
+        "id": "date_demande",
+        "label": "Date de la demande",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "Quelle est la date de la demande d'occupation ?"
+      },
+      {
+        "id": "objet_occupation",
+        "label": "Objet de l'occupation",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "Quel est l'objet de l'occupation du domaine public ? (terrasse, échafaudage, étalage, etc.)"
+      },
+      {
+        "id": "adresse_occupation",
+        "label": "Adresse de l'occupation",
+        "type": "text",
+        "required": true,
+        "question_chatbot": "À quelle adresse se situe l'emplacement demandé ?"
+      },
+      {
+        "id": "surface_m2",
+        "label": "Surface en m²",
+        "type": "number",
+        "required": true,
+        "question_chatbot": "Quelle est la superficie occupée en m² ?"
+      },
+      {
+        "id": "date_debut",
+        "label": "Date de début d'occupation",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "À quelle date commence l'occupation ?"
+      },
+      {
+        "id": "date_fin",
+        "label": "Date de fin d'occupation",
+        "type": "date",
+        "required": true,
+        "question_chatbot": "À quelle date se termine l'occupation ?"
+      },
+      {
+        "id": "montant_redevance",
+        "label": "Montant de la redevance (€)",
+        "type": "number",
+        "required": true,
+        "question_chatbot": "Quel est le montant de la redevance d'occupation ?"
+      },
+      {
+        "id": "prescriptions_supplementaires",
+        "label": "Prescriptions supplémentaires",
+        "type": "text",
+        "required": false,
+        "question_chatbot": "Y a-t-il des prescriptions techniques supplémentaires ?"
+      },
+      {
+        "id": "horaires_autorises",
+        "label": "Horaires autorisés",
+        "type": "text",
+        "required": false,
+        "default": "tous les jours de 8h00 à 22h00"
+      },
+      {
+        "id": "delai_remise_etat",
+        "label": "Délai de remise en état (jours)",
+        "type": "number",
+        "required": false,
+        "default": "15"
+      },
+      {
+        "id": "tribunal_administratif",
+        "label": "Tribunal administratif compétent",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      },
+      {
+        "id": "date_signature",
+        "label": "Date de signature",
+        "type": "date",
+        "required": true,
+        "auto_fill": true,
+        "source": "today"
+      },
+      {
+        "id": "maire_nom",
+        "label": "Nom du maire",
+        "type": "text",
+        "required": true,
+        "auto_fill": true,
+        "source": "commune"
+      }
+    ]
+  }
+}

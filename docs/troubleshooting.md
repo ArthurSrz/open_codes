@@ -11,12 +11,60 @@ This document provides solutions to common issues encountered during the impleme
 
 ## Table of Contents
 
-1. [PISTE API Issues](#piste-api-issues)
-2. [Mistral AI Embedding Issues](#mistral-ai-embedding-issues)
-3. [Database & Schema Issues](#database--schema-issues)
-4. [Sync Performance Issues](#sync-performance-issues)
-5. [Data Quality Issues](#data-quality-issues)
-6. [Vector Search Issues](#vector-search-issues)
+1. [Authentication & Authorization Issues](#authentication--authorization-issues)
+2. [PISTE API Issues](#piste-api-issues)
+3. [Mistral AI Embedding Issues](#mistral-ai-embedding-issues)
+4. [Database & Schema Issues](#database--schema-issues)
+5. [Sync Performance Issues](#sync-performance-issues)
+6. [Data Quality Issues](#data-quality-issues)
+7. [Vector Search Issues](#vector-search-issues)
+
+---
+
+## Authentication & Authorization Issues
+
+### Issue: Unable to Locate Auth Extras Field
+
+**Symptoms**:
+- Error: `Unable to locate auth: extras.gestionnaire`
+- API endpoint returns 500 error when checking user permissions
+- Precondition using `$auth.extras.gestionnaire` fails
+
+**Cause**: In Xano, the `$auth` object from JWT authentication does NOT automatically include custom fields from the auth table (like `gestionnaire`). The `extras` field is not populated by default with custom table columns.
+
+**Broken Code**:
+```xanoscript
+// ❌ This fails - extras.gestionnaire is not automatically populated
+precondition ($auth.extras.gestionnaire || $auth.role == "admin") {
+  error_type = "accessdenied"
+  error = "Access denied"
+}
+```
+
+**Solution**: Query the user directly from the database using the authenticated user's ID:
+
+```xanoscript
+// ✅ Correct approach - fetch user record to check custom fields
+db.get "utilisateurs" {
+  field_name = "id"
+  field_value = $auth.id
+  description = "Fetch authenticated user"
+} as $user
+
+precondition ($user.gestionnaire == true || $auth.role == "admin") {
+  error_type = "accessdenied"
+  error = "Accès réservé aux gestionnaires et administrateurs"
+}
+```
+
+**Why This Works**:
+- `$auth.id` is always available from the JWT token
+- `db.get` fetches the full user record including custom fields like `gestionnaire`
+- The precondition then checks the actual database value
+
+**Alternative**: Configure auth extras in Xano settings (more complex, requires modifying auth configuration for the workspace).
+
+**Fixed in**: API `sync_legifrance_lancer` (ID 924, workspace 5, branch `requete_textes`) - 2026-02-06
 
 ---
 
@@ -586,6 +634,413 @@ If issues persist:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-01-29
+## Document Generation Issues (Feature 002)
+
+### Issue: DOCX Placeholders Split Across XML Runs
+
+**Symptoms**:
+- `{{placeholder}}` not replaced in generated document
+- Some placeholders work, others don't
+- Generated DOCX has raw `{{placeholder_name}}` text visible
+
+**Cause**: When a DOCX template is edited in Microsoft Word, Word may split `{{placeholder}}` across multiple XML `<w:r>` (run) elements:
+```xml
+<!-- Word may produce this fragmented XML: -->
+<w:r><w:t>{{</w:t></w:r>
+<w:r><w:t>placeholder</w:t></w:r>
+<w:r><w:t>_name</w:t></w:r>
+<w:r><w:t>}}</w:t></w:r>
+```
+
+**Solution**:
+1. **Prevention**: Use `python-docx` to generate templates programmatically (our `create_templates.py` produces clean single-run placeholders)
+2. **Detection**: Check generated DOCX for unreplaced `{{` patterns
+3. **Fix in Word**: Select the placeholder text, delete it, and retype it in one go (without formatting changes in between)
+
+**Template Creation Best Practice**:
+- Type `{{placeholder_name}}` in one continuous action
+- Do NOT apply different formatting to parts of the placeholder
+- Do NOT copy-paste placeholder text from another source
+- Verify with: unzip template.docx and grep for `\{\{` in `word/document.xml`
+
+---
+
+### Issue: XML Special Characters in Placeholder Values
+
+**Symptoms**:
+- Generated DOCX file is corrupted / won't open
+- Error: "The file is damaged and cannot be opened"
+- Values containing `&`, `<`, `>`, or `"` cause issues
+
+**Cause**: Placeholder values with XML special characters break the XML structure of `word/document.xml`.
+
+**Solution**: Always XML-escape values before substitution:
+```xanoscript
+// ✅ Correct - escape XML special chars
+var $valeur_safe {
+  value = $valeur_brute|replace:"&":"&amp;"|replace:"<":"&lt;"|replace:">":"&gt;"|replace:"\"":"&quot;"
+}
+```
+
+**Already implemented** in `docx_remplir_placeholders.xs` and `917_generer_document_final_POST.xs`.
+
+---
+
+### Issue: file.unzip / file.zip Not Available in XanoScript
+
+**Symptoms**:
+- Error: "Unknown function: file.unzip"
+- DOCX processing pipeline fails
+
+**Cause**: XanoScript may not support `file.unzip` and `file.zip` natively. These are hypothetical functions based on the plan.
+
+**Workaround**: If `file.unzip`/`file.zip` are not available:
+1. Use an external service (e.g., a Node.js Cloud Function) for ZIP manipulation
+2. Or use the `api.request` to a ZIP manipulation API
+3. Or pre-process templates: store `word/document.xml` as a separate text field in the template table, and use client-side JavaScript to reconstruct the DOCX
+
+**Investigation needed**: Test `file.unzip` availability in Xano workspace 5 before deployment.
+
+---
+
+### Issue: Chatbot Date Parsing Inconsistency
+
+**Symptoms**:
+- Dates entered as "15 mars 2026" not correctly parsed
+- Mistral returns "INVALIDE" for valid French date formats
+
+**Solution**: The `916_collecter_donnees_chatbot_POST.xs` endpoint uses Mistral to parse dates. Ensure the system prompt is explicit about accepted formats:
+```
+"Convertis le texte en date au format JJ/MM/AAAA. Accepte les formats:
+'15/03/2026', '15 mars 2026', '15-03-2026', 'le 15 mars'.
+Si l'année n'est pas précisée, utilise l'année en cours."
+```
+
+---
+
+### Issue: `format_timestamp` vs `date` Filter in XanoScript
+
+**Symptoms**:
+- Error: "Invalid filter name: date" when using `"now"|date:"d/m/Y"`
+- Error: "Invalid filter name: to_date" when using `"now"|to_date:"d/m/Y"`
+- Only happens inside chained `|set:` expressions
+
+**Cause**: The `date` and `to_date` filters do not exist in XanoScript. The correct filter is `format_timestamp`.
+
+**Solution**:
+```xanoscript
+// ❌ BROKEN - these filters don't exist
+var $date { value = "now"|date:"d/m/Y" }
+var $date { value = "now"|to_date:"d/m/Y" }
+
+// ✅ WORKING - use format_timestamp
+var $date { value = now|format_timestamp:"d/m/Y" }
+
+// ⚠️ If inside |set: chain, break into separate var.update:
+var $data { value = {commune: "Test"} }
+var $date_str { value = now|format_timestamp:"d/m/Y" }
+var.update $data { value = $data|set:"date_signature":$date_str }
+```
+
+**Fixed in**: API `917_generer_document_final_POST.xs` (genere_template branch) - 2026-02-06
+
+---
+
+### Issue: `db.edit` Cannot Accept Variable Reference for `data`
+
+**Symptoms**:
+- Error: "Invalid kind for data - assign:var"
+- Happens when passing `data = $my_variable` to `db.edit`
+
+**Cause**: XanoScript `db.edit` requires an inline object literal for the `data` field, not a variable reference.
+
+**Broken Code**:
+```xanoscript
+// ❌ BROKEN
+var $updates { value = {nom: "New Name", version: 2} }
+db.edit "table" {
+  field_name = "id"
+  field_value = 1
+  data = $updates  // Error!
+}
+```
+
+**Solution**: Use inline object with pre-computed variables:
+```xanoscript
+// ✅ WORKING - compute values in separate vars, use inline object
+var $final_nom { value = $input.nom != "" ? $input.nom : $template.nom }
+db.edit "table" {
+  field_name = "id"
+  field_value = 1
+  data = {
+    nom: $final_nom,
+    version: $template.version + 1
+  }
+}
+```
+
+**Fixed in**: API `921_maj_template_PUT.xs` (genere_template branch) - 2026-02-06
+
+---
+
+### Issue: API Group Uses `docs` Not `description`
+
+**Symptoms**:
+- Error: "Invalid kind for description" when creating API group
+- Error: "Invalid block: tag" when using tag field
+
+**Cause**: API group blocks use `docs` (not `description`) and don't support `tag`.
+
+**Solution**:
+```xanoscript
+// ❌ BROKEN
+api_group "My Group" {
+  description = "Some description"
+  tag = ["tag1"]
+}
+
+// ✅ WORKING
+api_group "My Group" {
+  docs = "Some description"
+}
+```
+
+**Fixed in**: API groups Doc Generator (56), Admin Templates (57) - 2026-02-06
+
+---
+
+### Issue: MCP Tool Key Names and Ternary Operators
+
+**Symptoms**:
+- Error: "Syntax error: unexpected 'action:'" in MCP tool result objects
+- Ternary operators inside inline objects cause parse errors
+
+**Cause**: Certain key names like `action` may conflict with XanoScript reserved words inside tool contexts. Ternary operators in complex inline objects can also cause parser failures.
+
+**Solution**:
+```xanoscript
+// ❌ BROKEN - 'action' key and ternary in inline object
+var.update $resultat {
+  value = {
+    action: "lister",
+    message: $complete ? "Done" : "More"
+  }
+}
+
+// ✅ WORKING - rename key, use separate conditional
+var $msg { value = "" }
+conditional {
+  if ($complete) { var.update $msg { value = "Done" } }
+  else { var.update $msg { value = "More" } }
+}
+var.update $resultat {
+  value = { act: "lister", message: $msg }
+}
+```
+
+**Fixed in**: MCP tool `genere_acte_admistratif` (ID: 24) - 2026-02-06
+
+---
+
+### Issue: DOCX Pipeline - Two-Copy Pattern Required
+
+**Symptoms**:
+- `zip.delete_from_archive` returns "Invalid zip" error
+- `zip.create_archive` crashes with fatal 500 error
+- Modified DOCX can't be opened
+
+**Cause**: Xano ZIP operations have specific constraints:
+1. `zip.create_archive` is broken (fatal error) — cannot create ZIP from scratch
+2. `zip.delete_from_archive` and `zip.add_to_archive` require `.zip` extension on the file resource
+3. `zip.extract` works with `.docx` extension but write operations don't
+
+**Solution**: Use the **two-copy pattern**:
+```xanoscript
+// 1. Download template DOCX
+api.request {
+  url = $template.fichier_docx.url
+  method = "GET"
+} as $docx_dl
+
+// 2. Create TWO copies with different extensions
+storage.create_file_resource {
+  filename = "read_copy.docx"      // .docx for reading/extracting
+  filedata = $docx_dl.response.result
+} as $read_copy
+
+storage.create_file_resource {
+  filename = "output.zip"           // .zip for write operations
+  filedata = $docx_dl.response.result
+} as $output_copy
+
+// 3. Extract from .docx copy
+zip.extract {
+  zip = $read_copy
+  password = ""                     // Required! Even if no password
+} as $extracted_files
+
+// 4. Read document.xml content
+foreach ($extracted_files) {
+  each as $f {
+    conditional {
+      if ($f.name == "word/document.xml") {
+        storage.read_file_resource {
+          value = $f.resource        // NOT $f.content (doesn't exist)
+        } as $read_result
+        // Content is in $read_result.data
+      }
+      else { }
+    }
+  }
+}
+
+// 5. Modify content, then rebuild using .zip copy
+zip.delete_from_archive {
+  filename = "word/document.xml"
+  zip = $output_copy
+  password = ""                     // Required!
+}
+
+storage.create_file_resource {
+  filename = "document.xml"
+  filedata = $xml_modifie
+} as $xml_file
+
+zip.add_to_archive {
+  file = $xml_file
+  filename = "word/document.xml"
+  zip = $output_copy
+  password = ""                     // Required!
+  password_encryption = ""          // Required!
+}
+
+// 6. Persist for DB storage
+storage.create_attachment {
+  value = $output_copy
+  access = "public"
+  filename = "document_genere.docx"
+} as $docx_attachment
+
+// Use $docx_attachment (NOT $output_copy) in db.add
+db.add documents_generes {
+  data = { fichier_docx: $docx_attachment }
+}
+```
+
+**Key Rules**:
+- `.docx` extension for `zip.extract` (read operations)
+- `.zip` extension for `zip.delete_from_archive` and `zip.add_to_archive` (write operations)
+- All zip operations require `password = ""` even when no password is used
+- `zip.add_to_archive` also requires `password_encryption = ""`
+- Extracted files have `{name, size, last_modified, resource}` — use `storage.read_file_resource` to get content
+- Use `storage.create_attachment` to persist file resources for database storage
+
+**Fixed in**: API 1071 `generer_document_final`, MCP tool 24 `genere_acte_administratif` - 2026-02-07
+
+---
+
+### Issue: `object.entries` Returns Objects, Not Arrays
+
+**Symptoms**:
+- `$e[0]` and `$e[1]` return `null` when iterating `object.entries` results
+- Placeholder replacement loop does nothing (0 replacements)
+
+**Cause**: In XanoScript, `object.entries` returns `[{key: "...", value: "..."}]` objects, NOT JavaScript-style `[[key, value]]` arrays.
+
+**Broken Code**:
+```xanoscript
+// ❌ BROKEN - array indexing returns null
+object.entries { value = $my_obj } as $entries
+foreach ($entries) {
+  each as $e {
+    var $key { value = $e[0] }    // null!
+    var $val { value = $e[1] }    // null!
+  }
+}
+```
+
+**Solution**:
+```xanoscript
+// ✅ WORKING - use .key and .value properties
+object.entries { value = $my_obj } as $entries
+foreach ($entries) {
+  each as $e {
+    var $key { value = $e.key }    // correct!
+    var $val { value = $e.value }  // correct!
+  }
+}
+```
+
+**Fixed in**: API 1071 `generer_document_final`, MCP tool 24 - 2026-02-07
+
+---
+
+### Issue: `||` (OR) Operator in db.query Where Clauses
+
+**Symptoms**:
+- Complex where clause `(A && (B || C))` fails at runtime
+- Error varies: sometimes syntax error, sometimes unexpected results
+
+**Cause**: Nested OR conditions in db.query where clauses are unreliable in XanoScript.
+
+**Broken Code**:
+```xanoscript
+// ❌ BROKEN - nested OR in where clause
+db.query templates {
+  where = $db.templates.actif == true
+    && ($db.templates.communes_id == $user.commune_id
+    || $db.templates.is_global == true)
+}
+```
+
+**Solution**: Split into two separate queries and merge:
+```xanoscript
+// ✅ WORKING - two queries + merge
+db.query templates {
+  where = $db.templates.actif == true && $db.templates.communes_id == $user.commune_id
+} as $q1
+
+db.query templates {
+  where = $db.templates.actif == true && $db.templates.is_global == true
+} as $q2
+
+var $results { value = $q1|merge:$q2 }
+```
+
+For preconditions, use a conditional block with a flag variable:
+```xanoscript
+// ✅ WORKING - conditional flag instead of ||
+var $has_access { value = false }
+conditional {
+  if ($template.communes_id == $user.commune_id) {
+    var.update $has_access { value = true }
+  }
+  elseif ($template.is_global) {
+    var.update $has_access { value = true }
+  }
+  else { }
+}
+precondition ($has_access) { error_type = "accessdenied" error = "Accès refusé" }
+```
+
+**Fixed in**: APIs 1064, 1067, MCP tool 24 - 2026-02-07
+
+---
+
+### Issue: Mistral Date Parser Rejects Already-Formatted Dates
+
+**Symptoms**:
+- Mistral returns "INVALIDE" for input like "15/02/2026" (already in JJ/MM/AAAA format)
+- Only happens when the date is already correctly formatted
+
+**Cause**: The Mistral date parsing prompt may reject already-formatted dates depending on model behavior.
+
+**Workaround**: Users should provide dates in natural language ("le quinze février 2026") rather than formatted dates. A future fix could pre-check if the input already matches `JJ/MM/AAAA` regex and skip Mistral parsing.
+
+**Status**: Known limitation, low priority (chatbot flow naturally uses natural language)
+
+---
+
+**Document Version**: 3.0
+**Last Updated**: 2026-02-07
 **Maintained By**: marIAnne development team

@@ -1,0 +1,25 @@
+name: Push Legal Chunks to HuggingFace
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 06:00 UTC daily (4h after Xano sync at 02:00)
+  workflow_dispatch: {}    # Manual trigger
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements-hf.txt
+
+      - name: Export chunks to HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          XANO_BASE_URL: ${{ secrets.XANO_BASE_URL }}
+        run: python scripts/export_to_hf.py

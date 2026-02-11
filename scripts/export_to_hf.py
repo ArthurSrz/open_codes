@@ -22,7 +22,7 @@ import requests
 from datasets import Dataset, Features, Sequence, Value
 
 
-HF_REPO_ID = "ArthurSrz/french-legal-chunks"
+HF_REPO_ID = "ArthurSrz/open_codes"
 CHUNKS_PER_PAGE = 500
 ARTICLES_PER_PAGE = 200
 
@@ -258,7 +258,9 @@ size_categories:
   - 1K<n<10K
 ---
 
-# French Legal Code Chunks with Embeddings
+# Open Codes
+
+Open dataset of French legal code articles with embeddings.
 
 Chunked articles from 5 French legal codes sourced from
 [Legifrance](https://www.legifrance.gouv.fr/) via the PISTE API,
@@ -393,7 +395,7 @@ Special value: `32472144000000` (year 2999) means "no end date" — the article 
 from datasets import load_dataset
 from datetime import datetime, timezone
 
-ds = load_dataset("ArthurSrz/french-legal-chunks", split="train")
+ds = load_dataset("ArthurSrz/open_codes", split="train")
 
 # Access a chunk with its embedding and article metadata
 row = ds[0]

@@ -76,10 +76,23 @@ def fetch_all_articles(base_url: str) -> list[dict]:
     return _paginate(base_url, "/export_articles_dataset", "articles", ARTICLES_PER_PAGE)
 
 
+def fetch_code_names() -> dict[str, str]:
+    """Hardcoded LEX_codes_piste lookup: textId -> titre (only 5 codes)."""
+    return {
+        "LEGITEXT000006070633": "Code général des collectivités territoriales",
+        "LEGITEXT000006070162": "Code des communes",
+        "LEGITEXT000006070239": "Code électoral",
+        "LEGITEXT000006074075": "Code de l'urbanisme",
+        "LEGITEXT000006070721": "Code civil",
+    }
+
+
 def merge_chunks_with_articles(chunks: list[dict], articles: list[dict]) -> list[dict]:
     """Denormalize: enrich each chunk with its parent article metadata."""
     # Index articles by id_legifrance for O(1) lookup
     article_by_id = {a["id_legifrance"]: a for a in articles}
+    # Code textId -> human-readable name
+    code_names = fetch_code_names()
 
     merged = []
     orphans = 0
@@ -95,6 +108,8 @@ def merge_chunks_with_articles(chunks: list[dict], articles: list[dict]) -> list
         # DB column is contenu_article, but schema expects article_texte
         if "article_contenu_article" in row:
             row["article_texte"] = row.pop("article_contenu_article")
+        # Resolve code textId to human-readable name
+        row["code_name"] = code_names.get(chunk.get("code"), chunk.get("code", ""))
         merged.append(row)
 
     if orphans > 0:
@@ -149,6 +164,7 @@ def build_dataset_features() -> Features:
         "chunk_text": Value("string"),
         "embedding": Sequence(Value("float32"), length=1024),
         "id_legifrance": Value("string"),
+        "code_name": Value("string"),
         "chunk_index": Value("int32"),
         "start_position": Value("int32"),
         "end_position": Value("int32"),

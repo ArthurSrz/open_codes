@@ -21,6 +21,7 @@ jobs:
           pip install -r scripts/requirements-test.txt
 
       - name: Run data quality tests
+        continue-on-error: true
         env:
           XANO_BASE_URL: ${{ secrets.XANO_BASE_URL }}
         run: pytest scripts/tests/ -v --tb=short

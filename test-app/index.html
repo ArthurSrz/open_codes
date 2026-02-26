@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>marIAnne - Test Doc Generator</title>
+  <style>
+    :root {
+      --primary: #1e40af;
+      --primary-light: #3b82f6;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-light: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    header .user-info { font-size: 0.875rem; opacity: 0.9; }
+    .container { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .card h2 {
+      font-size: 1.125rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card h2 .step-num {
+      background: var(--primary);
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+    }
+    .card.disabled { opacity: 0.5; pointer-events: none; }
+    .card.active { border-color: var(--primary-light); box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+    .card.done { border-color: var(--success); }
+    .card.done h2 .step-num { background: var(--success); }
+    label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: var(--text-light); }
+    input, select {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      font-size: 0.9375rem;
+      margin-bottom: 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--primary-light); }
+    button {
+      padding: 0.625rem 1.25rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-light); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover:not(:disabled) { background: #15803d; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+    .log {
+      background: #0f172a;
+      color: #94a3b8;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8125rem;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log .ok { color: #4ade80; }
+    .log .err { color: #f87171; }
+    .log .info { color: #60a5fa; }
+    .log .warn { color: #fbbf24; }
+    .template-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .template-item {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .template-item:hover { border-color: var(--primary-light); background: #f0f7ff; }
+    .template-item.selected { border-color: var(--primary); background: #eff6ff; }
+    .template-item .name { font-weight: 600; }
+    .template-item .desc { font-size: 0.8125rem; color: var(--text-light); margin-top: 0.25rem; }
+    .placeholder-progress {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      color: var(--text-light);
+    }
+    .placeholder-progress .bar {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .placeholder-progress .bar .fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .question-box {
+      background: #f0f7ff;
+      border-left: 3px solid var(--primary);
+      padding: 0.75rem 1rem;
+      border-radius: 0 0.5rem 0.5rem 0;
+      margin-bottom: 0.75rem;
+      font-size: 0.9375rem;
+    }
+    .result-box {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 0.5rem;
+    }
+    .result-box .icon { font-size: 2rem; }
+    .result-box .details { flex: 1; }
+    .result-box .title { font-weight: 600; }
+    .result-box .meta { font-size: 0.8125rem; color: var(--text-light); }
+    .flex-row { display: flex; gap: 0.75rem; align-items: flex-end; }
+    .flex-row > * { flex: 1; }
+    .flex-row button { flex: 0 0 auto; margin-bottom: 0.75rem; }
+    #login-section { display: block; }
+    .hidden { display: none !important; }
+    .auto-fill-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.25rem 1rem;
+      font-size: 0.8125rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      background: #fefce8;
+      border-radius: 0.5rem;
+    }
+    .auto-fill-list dt { font-weight: 500; color: var(--text-light); }
+    .auto-fill-list dd { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>marIAnne - Test Doc Generator</h1>
+  <div class="user-info" id="user-info"></div>
+</header>
+
+<div class="container">
+  <!-- Step 0: Login -->
+  <div class="card active" id="step-login">
+    <h2><span class="step-num">0</span> Connexion</h2>
+    <div class="flex-row">
+      <div>
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="secretaire@commune.fr">
+      </div>
+      <div>
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" placeholder="Mot de passe">
+      </div>
+      <button class="btn-primary" onclick="login()">Connexion</button>
+    </div>
+  </div>
+
+  <!-- Step 1: List templates -->
+  <div class="card disabled" id="step-templates">
+    <h2><span class="step-num">1</span> Choisir un template</h2>
+    <div id="templates-list" class="template-list"></div>
+    <div style="margin-top: 1rem">
+      <button class="btn-primary" id="btn-start" onclick="startSession()" disabled>Demarrer la generation</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Collect data -->
+  <div class="card disabled" id="step-collect">
+    <h2><span class="step-num">2</span> Collecte des donnees</h2>
+    <div id="auto-fill-info"></div>
+    <div class="placeholder-progress" id="progress-bar">
+      <span id="progress-text">0 / 0</span>
+      <div class="bar"><div class="fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div id="question-container"></div>
+    <div class="flex-row">
+      <div>
+        <label for="user-input">Votre reponse</label>
+        <input type="text" id="user-input" placeholder="Tapez votre reponse..." onkeydown="if(event.key==='Enter')collectData()">
+      </div>
+      <button class="btn-primary" onclick="collectData()">Envoyer</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Generate -->
+  <div class="card disabled" id="step-generate">
+    <h2><span class="step-num">3</span> Generation du document</h2>
+    <button class="btn-success" onclick="generateDocument()">Generer le DOCX</button>
+    <div id="generate-result" class="hidden" style="margin-top: 1rem"></div>
+  </div>
+
+  <!-- Step 4: Download -->
+  <div class="card disabled" id="step-download">
+    <h2><span class="step-num">4</span> Telecharger</h2>
+    <div id="download-result"></div>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <h2>Journal</h2>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+  // Configuration
+  const AUTH_BASE = 'https://xsxf-qasi-dpir.p7.xano.io/api:LyRjnFis:genere_template';
+  const DOC_BASE  = 'https://xsxf-qasi-dpir.p7.xano.io/api:usIHn06x:genere_template';
+
+  // State
+  let token = null;
+  let selectedTemplateId = null;
+  let sessionId = null;
+  let placeholders = [];
+  let currentPlaceholderIndex = 0;
+  let nbCollected = 0;
+  let totalQuestions = 0;
+  let documentId = null;
+
+  // ── Logging ──
+  const logEl = document.getElementById('log');
+  function log(msg, cls = '') {
+    const line = document.createElement('span');
+    line.className = cls;
+    line.textContent = `[${new Date().toLocaleTimeString('fr-FR')}] ${msg}\n`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ── API helper ──
+  async function api(base, path, method = 'GET', body = null) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json' }
+    };
+    if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+    if (body) opts.body = JSON.stringify(body);
+    const url = `${base}${path}`;
+    log(`${method} ${path}`, 'info');
+    const res = await fetch(url, opts);
+    const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data.message || data.error || JSON.stringify(data);
+      log(`ERREUR ${res.status}: ${errMsg}`, 'err');
+      throw new Error(errMsg);
+    }
+    return data;
+  }
+
+  // ── Step management ──
+  function setStep(stepId, state) {
+    const el = document.getElementById(stepId);
+    el.classList.remove('disabled', 'active', 'done');
+    if (state) el.classList.add(state);
+  }
+
+  // ── Step 0: Login ──
+  async function login() {
+    try {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      if (!email || !password) { log('Email et mot de passe requis', 'warn'); return; }
+
+      const data = await api(AUTH_BASE, '/auth/login', 'POST', { email, password });
+      token = data.authToken;
+      log(`Connecte avec succes (token: ${token.substring(0, 20)}...)`, 'ok');
+
+      // Get user info
+      const me = await api(AUTH_BASE, '/auth/me');
+      document.getElementById('user-info').textContent = `${me.nom || me.email} | ${me.commune_nom || ''}`;
+      log(`Utilisateur: ${me.nom || me.email}, Commune: ${me.commune_nom || 'N/A'}`, 'ok');
+
+      setStep('step-login', 'done');
+      setStep('step-templates', 'active');
+      loadTemplates();
+    } catch (e) {
+      log(`Echec connexion: ${e.message}`, 'err');
+    }
+  }
+
+  // ── Step 1: List templates ──
+  async function loadTemplates() {
+    try {
+      const templates = await api(DOC_BASE, '/doc_generator/liste_templates_disponibles');
+      const list = document.getElementById('templates-list');
+      list.innerHTML = '';
+
+      if (!templates || templates.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-light)">Aucun template disponible.</p>';
+        log('Aucun template trouve', 'warn');
+        return;
+      }
+
+      log(`${templates.length} template(s) disponible(s)`, 'ok');
+
+      templates.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'template-item';
+        div.innerHTML = `<div class="name">${t.nom} ${t.is_global ? '(global)' : ''}</div>
+          <div class="desc">${t.description || 'Pas de description'}</div>`;
+        div.onclick = () => {
+          document.querySelectorAll('.template-item').forEach(el => el.classList.remove('selected'));
+          div.classList.add('selected');
+          selectedTemplateId = t.id;
+          document.getElementById('btn-start').disabled = false;
+          log(`Template selectionne: ${t.nom} (ID: ${t.id})`, 'info');
+        };
+        list.appendChild(div);
+      });
+    } catch (e) {
+      log(`Erreur chargement templates: ${e.message}`, 'err');
+    }
+  }
+
+  // ── Step 1b: Start session ──
+  async function startSession() {
+    if (!selectedTemplateId) return;
+    try {
+      const data = await api(DOC_BASE, '/doc_generator/demarrer_generation_document', 'POST', {
+        template_id: selectedTemplateId
+      });
+
+      sessionId = data.session_id;
+      placeholders = data.placeholders_a_collecter || [];
+      totalQuestions = data.total_questions || placeholders.length;
+      currentPlaceholderIndex = 0;
+      nbCollected = 0;
+
+      log(`Session ${sessionId} creee pour "${data.template.nom}"`, 'ok');
+      log(`${totalQuestions} question(s) a poser, ${Object.keys(data.donnees_auto || {}).length} champ(s) auto-remplis`, 'info');
+
+      // Show auto-fill data
+      const autoFill = data.donnees_auto || {};
+      const autoKeys = Object.keys(autoFill);
+      if (autoKeys.length > 0) {
+        let html = '<div class="auto-fill-list"><dl>';
+        autoKeys.forEach(k => {
+          html += `<dt>${k}</dt><dd>${autoFill[k] || '(vide)'}</dd>`;
+        });
+        html += '</dl></div>';
+        document.getElementById('auto-fill-info').innerHTML = html;
+      }
+
+      setStep('step-templates', 'done');
+      setStep('step-collect', 'active');
+      updateProgress();
+      showNextQuestion();
+    } catch (e) {
+      log(`Erreur demarrage: ${e.message}`, 'err');
+    }
+  }
+
+  // ── Step 2: Collect data ──
+  function updateProgress() {
+    const pct = totalQuestions > 0 ? (nbCollected / totalQuestions * 100) : 0;
+    document.getElementById('progress-text').textContent = `${nbCollected} / ${totalQuestions}`;
+    document.getElementById('progress-fill').style.width = `${pct}%`;
+  }
+
+  function showNextQuestion() {
+    const container = document.getElementById('question-container');
+    if (currentPlaceholderIndex >= placeholders.length) {
+      container.innerHTML = '<div class="question-box" style="border-color:var(--success);background:#f0fdf4">Toutes les donnees ont ete collectees !</div>';
+      document.getElementById('user-input').disabled = true;
+      setStep('step-collect', 'done');
+      setStep('step-generate', 'active');
+      return;
+    }
+    const ph = placeholders[currentPlaceholderIndex];
+    const question = ph.question_chatbot || `Quelle est la valeur pour : ${ph.label} ?`;
+    container.innerHTML = `<div class="question-box">${question}</div>
+      <div style="font-size:0.75rem;color:var(--text-light);margin-bottom:0.5rem">
+        Placeholder: <code>${ph.id}</code> | Type: ${ph.type || 'text'} | ${ph.required ? 'Requis' : 'Optionnel'}
+      </div>`;
+    document.getElementById('user-input').value = '';
+    document.getElementById('user-input').focus();
+  }
+
+  async function collectData() {
+    const input = document.getElementById('user-input');
+    const value = input.value.trim();
+    if (!value) return;
+    if (currentPlaceholderIndex >= placeholders.length) return;
+
+    const ph = placeholders[currentPlaceholderIndex];
+
+    try {
+      const data = await api(DOC_BASE, '/doc_generator/collecter_donnees_chatbot', 'POST', {
+        session_id: sessionId,
+        placeholder_id: ph.id,
+        message_utilisateur: value
+      });
+
+      if (data.valide) {
+        log(`${ph.id} = "${data.valeur_interpretee}" (interprete depuis "${value}")`, 'ok');
+        nbCollected = data.nb_collectes || (nbCollected + 1);
+        currentPlaceholderIndex++;
+        updateProgress();
+        showNextQuestion();
+      } else {
+        log(`Valeur rejetee pour ${ph.id}: ${data.message_erreur || 'invalide'}`, 'warn');
+        const container = document.getElementById('question-container');
+        container.innerHTML += `<div style="color:var(--danger);font-size:0.875rem;margin-bottom:0.5rem">
+          Valeur invalide. ${data.message_erreur || 'Veuillez reessayer.'}</div>`;
+        input.value = '';
+        input.focus();
+      }
+    } catch (e) {
+      log(`Erreur collecte: ${e.message}`, 'err');
+    }
+  }
+
+  // ── Step 3: Generate ──
+  async function generateDocument() {
+    try {
+      log('Generation du DOCX en cours...', 'info');
+      const data = await api(DOC_BASE, '/doc_generator/generer_document_final', 'POST', {
+        session_id: sessionId
+      });
+
+      documentId = data.document_id;
+      log(`Document genere ! ID: ${data.document_id}, Titre: "${data.titre}", ${data.placeholders_remplaces} placeholders remplaces en ${data.duree_ms}ms`, 'ok');
+
+      document.getElementById('generate-result').classList.remove('hidden');
+      document.getElementById('generate-result').innerHTML = `
+        <div class="result-box">
+          <div class="icon">&#128196;</div>
+          <div class="details">
+            <div class="title">${data.titre}</div>
+            <div class="meta">${data.placeholders_remplaces} remplacements | ${data.duree_ms}ms | Statut: ${data.statut}</div>
+          </div>
+        </div>`;
+
+      setStep('step-generate', 'done');
+      setStep('step-download', 'active');
+      loadDownload();
+    } catch (e) {
+      log(`Erreur generation: ${e.message}`, 'err');
+    }
+  }
+
+  // ── Step 4: Download ──
+  async function loadDownload() {
+    try {
+      const data = await api(DOC_BASE, `/doc_generator/telecharger_document_genere?document_id=${documentId}`);
+      log(`Lien de telechargement obtenu`, 'ok');
+
+      document.getElementById('download-result').innerHTML = `
+        <div class="result-box">
+          <div class="icon">&#9989;</div>
+          <div class="details">
+            <div class="title">${data.titre || 'Document genere'}</div>
+            <div class="meta">
+              ${data.fichier_docx ? `Taille: ${data.fichier_docx.size || '?'} octets | MIME: ${data.fichier_docx.mime || '?'}` : ''}
+            </div>
+            <div style="margin-top:0.5rem">
+              ${data.fichier_docx && data.fichier_docx.url
+                ? `<a href="${data.fichier_docx.url}" target="_blank" class="btn-success" style="text-decoration:none;display:inline-block;padding:0.5rem 1rem;border-radius:0.5rem">Telecharger le DOCX</a>`
+                : `<a href="${data.url_telechargement || '#'}" target="_blank" class="btn-success" style="text-decoration:none;display:inline-block;padding:0.5rem 1rem;border-radius:0.5rem">Telecharger le DOCX</a>`
+              }
+            </div>
+          </div>
+        </div>`;
+
+      setStep('step-download', 'done');
+      log('Pipeline termine avec succes !', 'ok');
+    } catch (e) {
+      log(`Erreur telechargement: ${e.message}`, 'err');
+    }
+  }
+</script>
+</body>
+</html>

@@ -44,14 +44,16 @@ def check_sync_status(base_url: str) -> bool:
     return True
 
 
-def _paginate(base_url: str, endpoint: str, key: str, per_page: int) -> list[dict]:
+def _paginate(base_url: str, endpoint: str, key: str, per_page: int, extra_params: dict | None = None) -> list[dict]:
     """Generic paginator for Xano export endpoints."""
     all_items = []
     page = 1
     while True:
-        url = f"{base_url}{endpoint}?page={page}&per_page={per_page}"
+        params: dict = {"page": page, "per_page": per_page}
+        if extra_params:
+            params.update(extra_params)
         print(f"  Fetching {key} page {page}...", end=" ")
-        resp = requests.get(url, timeout=60)
+        resp = requests.get(f"{base_url}{endpoint}", params=params, timeout=60)
         resp.raise_for_status()
         data = resp.json()
         # Xano paging wraps items: data[key] = {items: [...], itemsTotal, pageTotal, ...}
@@ -76,6 +78,32 @@ def fetch_all_chunks(base_url: str) -> list[dict]:
 def fetch_all_articles(base_url: str) -> list[dict]:
     """Paginate through the articles export endpoint."""
     return _paginate(base_url, "/export_articles_dataset", "articles", ARTICLES_PER_PAGE)
+
+
+# ── New source type fetch helpers ─────────────────────────────────────────────
+
+METADATA_PER_PAGE = 500
+
+
+def fetch_legal_chunks(base_url: str, source_type: str) -> list[dict]:
+    """Paginate REF_legal_chunks for a given source_type (non-stale only)."""
+    return _paginate(base_url, "/export_legal_chunks_dataset", "chunks", CHUNKS_PER_PAGE,
+                     extra_params={"source_type": source_type})
+
+
+def fetch_decisions_metadata(base_url: str) -> list[dict]:
+    """Paginate all REF_decisions_judilibre rows (source metadata for jurisprudence)."""
+    return _paginate(base_url, "/export_decisions_dataset", "decisions", METADATA_PER_PAGE)
+
+
+def fetch_circulaires_metadata(base_url: str) -> list[dict]:
+    """Paginate all REF_circulaires rows (source metadata for circulaires)."""
+    return _paginate(base_url, "/export_circulaires_dataset", "circulaires", METADATA_PER_PAGE)
+
+
+def fetch_reponses_metadata(base_url: str) -> list[dict]:
+    """Paginate all REF_reponses_ministerial rows (source metadata for reponses_legis)."""
+    return _paginate(base_url, "/export_reponses_dataset", "reponses", METADATA_PER_PAGE)
 
 
 def fetch_code_names(base_url: str) -> dict[str, str]:
@@ -151,6 +179,148 @@ def merge_chunks_with_articles(chunks: list[dict], articles: list[dict], base_ur
     if orphans > 0:
         print(f"  WARNING: {orphans} chunks had no matching article (skipped)")
     return merged
+
+
+# ── Generic merge for new source types ───────────────────────────────────────
+
+def _merge_chunks_with_metadata(
+    chunks: list[dict],
+    metadata: list[dict],
+    meta_id_field: str,
+    meta_fields: list[str],
+    include_zone: bool = False,
+) -> list[dict]:
+    """Join chunks with source metadata on source_id → meta_id_field.
+
+    Each merged row contains: chunk_text, embedding, source_id, chunk_index,
+    (optionally zone), plus all fields listed in meta_fields.
+    Chunks whose source_id has no matching metadata record are skipped (orphans).
+
+    Args:
+        chunks: list of REF_legal_chunks dicts (source_type, source_id, chunk_text, embedding, ...)
+        metadata: list of source records (REF_decisions_judilibre, REF_circulaires, ...)
+        meta_id_field: the field name in metadata records used as the lookup key (e.g. "id_judilibre")
+        meta_fields: list of field names to copy from each metadata record into the merged row
+        include_zone: whether to carry over the "zone" field from chunks (used for jurisprudence)
+    Returns:
+        list of merged dicts ready for _transform_legal_row → Dataset.from_list
+    """
+    meta_by_id = {m[meta_id_field]: m for m in metadata}
+    merged = []
+    orphans = 0
+    for chunk in chunks:
+        source_id = chunk.get("source_id", "")
+        meta = meta_by_id.get(source_id)
+        if meta is None:
+            orphans += 1
+            continue
+        row = {
+            "chunk_text": chunk.get("chunk_text", ""),
+            "embedding": chunk.get("embedding", []),
+            "source_id": source_id,
+            "chunk_index": chunk.get("chunk_index", 0),
+        }
+        if include_zone:
+            row["zone"] = chunk.get("zone", "")
+        for field in meta_fields:
+            row[field] = meta.get(field)
+        merged.append(row)
+    if orphans > 0:
+        print(f"  WARNING: {orphans} chunks had no matching source metadata (skipped)")
+    return merged
+
+
+# ── HuggingFace Features schemas for each new source type ────────────────────
+
+def build_jurisprudence_features() -> Features:
+    return Features({
+        "chunk_text": Value("string"),
+        "embedding": Sequence(Value("float32"), length=1024),
+        "source_id": Value("string"),
+        "chunk_index": Value("int32"),
+        "jurisdiction": Value("string"),
+        "chamber": Value("string"),
+        "date_decision": Value("string"),
+        "solution": Value("string"),
+        "fiche_arret": Value("string"),
+        "url_judilibre": Value("string"),
+        "zone": Value("string"),
+    })
+
+
+def build_circulaires_features() -> Features:
+    return Features({
+        "chunk_text": Value("string"),
+        "embedding": Sequence(Value("float32"), length=1024),
+        "source_id": Value("string"),
+        "chunk_index": Value("int32"),
+        "numero": Value("string"),
+        "date_parution": Value("string"),
+        "ministere": Value("string"),
+        "objet": Value("string"),
+        "url_legifrance": Value("string"),
+    })
+
+
+def build_reponses_features() -> Features:
+    return Features({
+        "chunk_text": Value("string"),
+        "embedding": Sequence(Value("float32"), length=1024),
+        "source_id": Value("string"),
+        "chunk_index": Value("int32"),
+        "numero_question": Value("string"),
+        "date_reponse": Value("string"),
+        "ministere": Value("string"),
+        "question_text": Value("string"),
+        "url_legifrance": Value("string"),
+    })
+
+
+# ── Dataset builders (merge + schema + Dataset.from_list) ─────────────────────
+
+def _transform_legal_row(raw: dict, features: Features) -> dict:
+    """Map a merged chunk dict to the dataset schema, coercing types as needed."""
+    row = {}
+    for col_name in features:
+        value = raw.get(col_name)
+        if col_name == "embedding" and isinstance(value, str):
+            value = json.loads(value)
+        row[col_name] = value
+    return row
+
+
+def build_jurisprudence_dataset(chunks: list[dict], decisions: list[dict]) -> Dataset:
+    merged = _merge_chunks_with_metadata(
+        chunks, decisions, "id_judilibre",
+        ["jurisdiction", "chamber", "date_decision", "solution", "fiche_arret", "url_judilibre"],
+        include_zone=True,
+    )
+    if not merged:
+        raise ValueError("jurisprudence: 0 merged rows — aborting to prevent empty push")
+    features = build_jurisprudence_features()
+    return Dataset.from_list([_transform_legal_row(r, features) for r in merged], features=features)
+
+
+def build_circulaires_dataset(chunks: list[dict], circulaires: list[dict]) -> Dataset:
+    merged = _merge_chunks_with_metadata(
+        chunks, circulaires, "id_circulaire",
+        ["numero", "date_parution", "ministere", "objet", "url_legifrance"],
+    )
+    if not merged:
+        raise ValueError("circulaires: 0 merged rows — aborting to prevent empty push")
+    features = build_circulaires_features()
+    return Dataset.from_list([_transform_legal_row(r, features) for r in merged], features=features)
+
+
+def build_reponses_dataset(chunks: list[dict], reponses: list[dict]) -> Dataset:
+    merged = _merge_chunks_with_metadata(
+        chunks, reponses, "id_reponse",
+        ["numero_question", "date_reponse", "ministere", "question_text", "url_legifrance"],
+    )
+    if not merged:
+        raise ValueError("reponses_legis: 0 merged rows — aborting to prevent empty push")
+    features = build_reponses_features()
+    return Dataset.from_list([_transform_legal_row(r, features) for r in merged], features=features)
 
 
 def build_dataset_features() -> Features:
@@ -518,17 +688,94 @@ def main():
     if bad > 0:
         print(f"WARNING: {bad} chunks have non-1024 embeddings")
 
+    # ── Step 4b: Fetch and build the 3 new source type configs ──────────────
+    print("\nFetching Judilibre decisions metadata...")
+    decisions_meta = fetch_decisions_metadata(base_url)
+    print(f"  {len(decisions_meta)} decisions fetched")
+
+    print("Fetching jurisprudence chunks...")
+    juris_chunks = fetch_legal_chunks(base_url, "judilibre")
+    print(f"  {len(juris_chunks)} chunks fetched")
+
+    print("Fetching circulaires metadata...")
+    circ_meta = fetch_circulaires_metadata(base_url)
+    print(f"  {len(circ_meta)} circulaires fetched")
+
+    print("Fetching circulaires chunks...")
+    circ_chunks = fetch_legal_chunks(base_url, "circulaire")
+    print(f"  {len(circ_chunks)} chunks fetched")
+
+    print("Fetching réponses ministérielles metadata...")
+    rep_meta = fetch_reponses_metadata(base_url)
+    print(f"  {len(rep_meta)} réponses fetched")
+
+    print("Fetching réponses chunks...")
+    rep_chunks = fetch_legal_chunks(base_url, "reponse_ministerielle")
+    print(f"  {len(rep_chunks)} chunks fetched")
+
+    # Build each new config — skip gracefully if source tables are empty
+    ds_juris = ds_circ = ds_rep = None
+
+    try:
+        print("\nBuilding jurisprudence dataset...")
+        ds_juris = build_jurisprudence_dataset(juris_chunks, decisions_meta)
+        print(f"  {ds_juris}")
+    except ValueError as e:
+        print(f"  SKIPPED: {e}")
+
+    try:
+        print("Building circulaires dataset...")
+        ds_circ = build_circulaires_dataset(circ_chunks, circ_meta)
+        print(f"  {ds_circ}")
+    except ValueError as e:
+        print(f"  SKIPPED: {e}")
+
+    try:
+        print("Building réponses légis dataset...")
+        ds_rep = build_reponses_dataset(rep_chunks, rep_meta)
+        print(f"  {ds_rep}")
+    except ValueError as e:
+        print(f"  SKIPPED: {e}")
+
     if args.dry_run:
-        print("DRY RUN complete. Dataset looks good. Skipping push.")
+        print("DRY RUN complete. All datasets built. Skipping push.")
         return
 
     # Step 5: Push to HuggingFace Hub with dataset card
-    print(f"Pushing to HuggingFace Hub: {HF_REPO_ID}...")
+    print(f"\nPushing default config to HuggingFace Hub: {HF_REPO_ID}...")
     ds.push_to_hub(
         HF_REPO_ID,
+        config_name="default",
         token=hf_token,
         commit_message=f"Daily update: {len(ds)} chunks from {len(raw_articles)} articles",
     )
+
+    if ds_juris is not None:
+        print("Pushing jurisprudence config...")
+        ds_juris.push_to_hub(
+            HF_REPO_ID,
+            config_name="jurisprudence",
+            token=hf_token,
+            commit_message=f"Update jurisprudence config: {len(ds_juris)} chunks",
+        )
+
+    if ds_circ is not None:
+        print("Pushing circulaires config...")
+        ds_circ.push_to_hub(
+            HF_REPO_ID,
+            config_name="circulaires",
+            token=hf_token,
+            commit_message=f"Update circulaires config: {len(ds_circ)} chunks",
+        )
+
+    if ds_rep is not None:
+        print("Pushing reponses_legis config...")
+        ds_rep.push_to_hub(
+            HF_REPO_ID,
+            config_name="reponses_legis",
+            token=hf_token,
+            commit_message=f"Update reponses_legis config: {len(ds_rep)} chunks",
+        )
 
     # Push dataset card
     from huggingface_hub import HfApi

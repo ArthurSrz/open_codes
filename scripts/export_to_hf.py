@@ -713,17 +713,29 @@ def main():
     rep_chunks = fetch_legal_chunks(base_url, "reponse_ministerielle")
     print(f"  {len(rep_chunks)} chunks fetched")
 
-    print("\nBuilding jurisprudence dataset...")
-    ds_juris = build_jurisprudence_dataset(juris_chunks, decisions_meta)
-    print(f"  {ds_juris}")
+    # Build each new config — skip gracefully if source tables are empty
+    ds_juris = ds_circ = ds_rep = None
 
-    print("Building circulaires dataset...")
-    ds_circ = build_circulaires_dataset(circ_chunks, circ_meta)
-    print(f"  {ds_circ}")
+    try:
+        print("\nBuilding jurisprudence dataset...")
+        ds_juris = build_jurisprudence_dataset(juris_chunks, decisions_meta)
+        print(f"  {ds_juris}")
+    except ValueError as e:
+        print(f"  SKIPPED: {e}")
 
-    print("Building réponses légis dataset...")
-    ds_rep = build_reponses_dataset(rep_chunks, rep_meta)
-    print(f"  {ds_rep}")
+    try:
+        print("Building circulaires dataset...")
+        ds_circ = build_circulaires_dataset(circ_chunks, circ_meta)
+        print(f"  {ds_circ}")
+    except ValueError as e:
+        print(f"  SKIPPED: {e}")
+
+    try:
+        print("Building réponses légis dataset...")
+        ds_rep = build_reponses_dataset(rep_chunks, rep_meta)
+        print(f"  {ds_rep}")
+    except ValueError as e:
+        print(f"  SKIPPED: {e}")
 
     if args.dry_run:
         print("DRY RUN complete. All datasets built. Skipping push.")
@@ -738,29 +750,32 @@ def main():
         commit_message=f"Daily update: {len(ds)} chunks from {len(raw_articles)} articles",
     )
 
-    print("Pushing jurisprudence config...")
-    ds_juris.push_to_hub(
-        HF_REPO_ID,
-        config_name="jurisprudence",
-        token=hf_token,
-        commit_message=f"Update jurisprudence config: {len(ds_juris)} chunks",
-    )
+    if ds_juris is not None:
+        print("Pushing jurisprudence config...")
+        ds_juris.push_to_hub(
+            HF_REPO_ID,
+            config_name="jurisprudence",
+            token=hf_token,
+            commit_message=f"Update jurisprudence config: {len(ds_juris)} chunks",
+        )
 
-    print("Pushing circulaires config...")
-    ds_circ.push_to_hub(
-        HF_REPO_ID,
-        config_name="circulaires",
-        token=hf_token,
-        commit_message=f"Update circulaires config: {len(ds_circ)} chunks",
-    )
+    if ds_circ is not None:
+        print("Pushing circulaires config...")
+        ds_circ.push_to_hub(
+            HF_REPO_ID,
+            config_name="circulaires",
+            token=hf_token,
+            commit_message=f"Update circulaires config: {len(ds_circ)} chunks",
+        )
 
-    print("Pushing reponses_legis config...")
-    ds_rep.push_to_hub(
-        HF_REPO_ID,
-        config_name="reponses_legis",
-        token=hf_token,
-        commit_message=f"Update reponses_legis config: {len(ds_rep)} chunks",
-    )
+    if ds_rep is not None:
+        print("Pushing reponses_legis config...")
+        ds_rep.push_to_hub(
+            HF_REPO_ID,
+            config_name="reponses_legis",
+            token=hf_token,
+            commit_message=f"Update reponses_legis config: {len(ds_rep)} chunks",
+        )
 
     # Push dataset card
     from huggingface_hub import HfApi

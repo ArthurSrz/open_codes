@@ -462,6 +462,23 @@ tags:
   - mistral
 size_categories:
   - 10K<n<100K
+configs:
+  - config_name: default
+    data_files:
+      - split: train
+        path: data/train-*.parquet
+  - config_name: jurisprudence
+    data_files:
+      - split: train
+        path: jurisprudence/train-*.parquet
+  - config_name: circulaires
+    data_files:
+      - split: train
+        path: circulaires/train-*.parquet
+  - config_name: reponses_legis
+    data_files:
+      - split: train
+        path: reponses_legis/train-*.parquet
 ---
 
 # Open Codes
@@ -591,13 +608,26 @@ Special value: `32472144000000` (year 2999) means "no end date" — the article 
 | `article_numeroBo` | string | BO number |
 | `article_inap` | string | INAP code |
 
+## Configs
+
+| Config | Description | Source |
+|--------|-------------|--------|
+| `default` | Code articles + chunks from Legifrance PISTE API | `REF_codes_legifrance` + `REF_article_chunks` |
+| `jurisprudence` | Court decisions from Judilibre API | `REF_decisions_judilibre` + `REF_legal_chunks` |
+| `circulaires` | Government circulars | `REF_circulaires` + `REF_legal_chunks` |
+| `reponses_legis` | Parliamentary written answers | `REF_reponses_ministerial` + `REF_legal_chunks` |
+
 ## Usage
 
 ```python
 from datasets import load_dataset
 from datetime import datetime, timezone
 
+# Load default config (code articles)
 ds = load_dataset("ArthurSrz/open_codes", split="train")
+
+# Load jurisprudence config (court decisions)
+juris = load_dataset("ArthurSrz/open_codes", "jurisprudence", split="train")
 
 # Access a chunk with its embedding and article metadata
 row = ds[0]

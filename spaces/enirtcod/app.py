@@ -18,6 +18,15 @@ from ui_components import build_tabs_html, build_article_card
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
 # ---------------------------------------------------------------------------
+# Logo — base64 inline (Gradio 5.x doesn't serve file/ paths reliably)
+# ---------------------------------------------------------------------------
+_logo_b64 = ""
+_logo_path = os.path.join(os.path.dirname(__file__), "logo_b64.txt")
+if os.path.exists(_logo_path):
+    with open(_logo_path) as f:
+        _logo_b64 = f.read().strip()
+
+# ---------------------------------------------------------------------------
 # Cold start — runs once at module import (Space startup)
 # ---------------------------------------------------------------------------
 print("[app] Starting dataset loading… (may take up to 90s)")
@@ -45,31 +54,29 @@ if DATASETS.get("circulaires"):
 # ---------------------------------------------------------------------------
 def run_search(query: str, source_filter: str, date_from: int, date_to: int,
                jurisdiction: str, code_name: str, ministere: str):
-    # Empty query guard
     if not query.strip():
         return (
-            gr.update(value="<p style='color:#9ca3af;font-style:italic'>Veuillez entrer une question juridique.</p>"),
+            gr.update(value='<p style="color:#94a3b8;font-style:italic;padding:12px 0">Veuillez entrer une question juridique.</p>'),
             gr.update(value=""),
         )
 
-    # Query length guard
     warning_note = ""
     if len(query) > 500:
         query = query[:500]
-        warning_note = "\n\n⚠️ *Requête tronquée à 500 caractères.*"
+        warning_note = "\n\n*Requete tronquee a 500 caracteres.*"
 
     try:
         embedding = embed_query(query, HF_TOKEN)
     except ValueError as e:
         return (
-            gr.update(value=f"<p style='color:#ef4444'>{e}</p>"),
+            gr.update(value=f'<p style="color:#dc2626;padding:12px 0">{e}</p>'),
             gr.update(value=""),
         )
 
     filters = {}
-    if date_from:
+    if date_from and int(date_from) > 2000:
         filters["date_from"] = int(date_from)
-    if date_to:
+    if date_to and int(date_to) < 2026:
         filters["date_to"] = int(date_to)
     if jurisdiction and jurisdiction != "Tous":
         filters["jurisdiction"] = jurisdiction
@@ -80,92 +87,213 @@ def run_search(query: str, source_filter: str, date_from: int, date_to: int,
 
     results = search_all(embedding, DATASETS, source_filter=source_filter, filters=filters)
 
-    # Cross-references: enrich article results with related decisions
     enriched_articles = []
     for r in results.get("articles", []):
         lf_id = r.get("id_legifrance", "")
         related = find_related_decisions(lf_id, DATASETS.get("jurisprudence"))
         enriched_articles.append((r, related))
 
-    # Build synthesis
     synthesis_text = synthesize(query, results, HF_TOKEN) + warning_note
 
-    # Build article cards with cross-references
     article_html = "".join(
         build_article_card(r, related) for r, related in enriched_articles
     )
-    # Temporarily replace articles list for tab builder (pass raw results for tab counts)
     tabs_html = build_tabs_html(results, LOADING_STATUS)
 
-    # Inject enriched article cards into the Articles tab
     if article_html and enriched_articles:
         plain_article_html = "".join(build_article_card(r) for r, _ in enriched_articles)
         tabs_html = tabs_html.replace(plain_article_html, article_html)
 
     synthesis_html = f"""
-    <div style="font-family:system-ui,sans-serif;background:#f8fafc;border-radius:8px;
-                padding:16px 20px;border-left:4px solid #2563eb;margin-bottom:16px">
-      <p style="font-size:13px;font-weight:700;color:#2563eb;margin:0 0 10px">Synthèse juridique</p>
-      <div style="font-size:14px;line-height:1.7;color:#1e293b;white-space:pre-wrap">{synthesis_text}</div>
+    <div style="background:#ffffff;border-radius:12px;padding:20px 24px;
+                border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <div style="width:4px;height:22px;background:#0f172a;border-radius:2px"></div>
+        <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0;letter-spacing:-0.2px">Synthese juridique</p>
+      </div>
+      <div style="font-size:14px;line-height:1.75;color:#334155;white-space:pre-wrap">{synthesis_text}</div>
     </div>"""
 
     return gr.update(value=synthesis_html), gr.update(value=tabs_html)
 
 
 # ---------------------------------------------------------------------------
+# Theme & CSS — Doctrine.fr-inspired design
+# ---------------------------------------------------------------------------
+CUSTOM_CSS = """
+/* ── Global theme overrides ── */
+:root {
+  --color-accent: #0f172a !important;
+  --color-accent-soft: #dbeafe !important;
+  --button-primary-background-fill: #0f172a !important;
+  --button-primary-background-fill-hover: #1e293b !important;
+  --button-primary-text-color: #ffffff !important;
+  --block-border-color: #cbd5e1 !important;
+  --block-background-fill: #ffffff !important;
+  --body-background-fill: #f1f5f9 !important;
+  --input-background-fill: #ffffff !important;
+  --block-label-text-color: #334155 !important;
+  --slider-color: #0f172a !important;
+}
+
+.gradio-container {
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  padding: 0 48px !important;
+  box-sizing: border-box !important;
+  background: #f1f5f9 !important;
+}
+
+/* ── Typography ── */
+.gradio-container, .gradio-container * {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+
+/* ── Search input ── */
+.gradio-container textarea {
+  border: 2px solid #94a3b8 !important;
+  border-radius: 10px !important;
+  font-size: 16px !important;
+  padding: 14px 18px !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+  background: #ffffff !important;
+}
+.gradio-container textarea:focus {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.12) !important;
+  outline: none !important;
+}
+
+/* ── Primary button ── */
+.gradio-container button.primary {
+  background: #0f172a !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+  padding: 14px 32px !important;
+  letter-spacing: 0.3px !important;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2) !important;
+}
+.gradio-container button.primary:hover {
+  background: #1e293b !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3) !important;
+}
+
+/* ── Dropdowns ── */
+.gradio-container select,
+.gradio-container .wrap input {
+  border: 2px solid #94a3b8 !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+/* ── Slider: override orange track ── */
+.gradio-container input[type="range"] {
+  accent-color: #0f172a !important;
+}
+.gradio-container .range-slider {
+  accent-color: #0f172a !important;
+}
+
+/* ── Accordion ── */
+.gradio-container .accordion {
+  border: 2px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+}
+.gradio-container .accordion summary {
+  font-weight: 600 !important;
+  color: #1e293b !important;
+}
+
+/* ── Block panels ── */
+.gradio-container .block {
+  border-radius: 10px !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+
+/* ── Hide footer ── */
+footer { display: none !important; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .gradio-container { max-width: 100% !important; padding: 0 12px !important; }
+}
+"""
+
+# ---------------------------------------------------------------------------
 # Gradio layout
 # ---------------------------------------------------------------------------
-LOADING_MSG = "Chargement des sources juridiques… (peut prendre jusqu'à 90 secondes)" \
-    if not all(LOADING_STATUS.values()) else ""
+theme = gr.themes.Soft(
+    primary_hue=gr.themes.colors.blue,
+    secondary_hue=gr.themes.colors.slate,
+    neutral_hue=gr.themes.colors.slate,
+    font=gr.themes.GoogleFont("Inter"),
+)
 
-with gr.Blocks(
-    title="enirtcod.fr — Recherche juridique française",
-    css="""
-    .gradio-container { max-width: 1100px !important; }
-    footer { display: none !important; }
-    """,
-) as demo:
+with gr.Blocks(title="enirtcod.fr — Recherche juridique francaise", css=CUSTOM_CSS, theme=theme) as demo:
 
-    gr.HTML("""
-    <div style="text-align:center;padding:24px 0 12px;font-family:system-ui,sans-serif">
-      <h1 style="font-size:28px;font-weight:800;color:#1e293b;margin:0">⚖️ enirtcod.fr</h1>
-      <p style="color:#64748b;font-size:14px;margin:6px 0 0">
-        Alternative open-source à Doctrine.fr · Recherche dans 4 sources juridiques françaises
-      </p>
+    # ── Header ──
+    _logo_html = (
+        f'<img src="data:image/png;base64,{_logo_b64}" alt="enirtcod logo"'
+        ' style="width:56px;height:56px;object-fit:contain;flex-shrink:0">'
+        if _logo_b64 else ""
+    )
+    gr.HTML(f"""
+    <div style="display:flex;align-items:center;gap:16px;padding:24px 0 8px">
+      {_logo_html}
+      <div>
+        <h1 style="font-size:36px;font-weight:800;color:#0f172a;margin:0;letter-spacing:-0.8px">
+          enirtcod<span style="color:#1d4ed8">.fr</span>
+        </h1>
+        <p style="color:#475569;font-size:15px;margin:4px 0 0;font-weight:500">
+          Recherchez dans les codes, la jurisprudence et les circulaires
+        </p>
+      </div>
     </div>""")
 
-    if LOADING_MSG:
-        gr.HTML(f"""
-        <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;
-                    padding:10px 16px;font-size:13px;color:#92400e;text-align:center">
-          ⏳ {LOADING_MSG}
-        </div>""")
+    # ── Search bar ──
+    gr.HTML('<div style="height:8px"></div>')
 
-    with gr.Row():
-        query_box = gr.Textbox(
-            placeholder="Ex : Quelles sont les conditions de la responsabilité civile délictuelle ?",
-            label="Question juridique",
-            lines=2,
-            scale=5,
-        )
+    query_box = gr.Textbox(
+        placeholder="Posez votre question : responsabilite civile, article 1240, licenciement abusif…",
+        label="",
+        lines=1,
+        show_label=False,
+    )
+
+    search_btn = gr.Button("Rechercher", variant="primary", size="lg")
+
+    # ── Example queries ──
+    gr.HTML("""
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0 8px">
+      <span style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:16px;padding:4px 14px;font-size:13px;color:#475569;cursor:default">droit de retractation achat en ligne</span>
+      <span style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:16px;padding:4px 14px;font-size:13px;color:#475569;cursor:default">obligation de securite employeur</span>
+      <span style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:16px;padding:4px 14px;font-size:13px;color:#475569;cursor:default">article L1232-1 code du travail</span>
+      <span style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:16px;padding:4px 14px;font-size:13px;color:#475569;cursor:default">vice cache immobilier</span>
+    </div>""")
+
+    # ── Filters ──
+    with gr.Accordion("Affiner la recherche", open=False):
         source_selector = gr.Dropdown(
             choices=["Tous", "Articles", "Jurisprudence", "Circulaires", "Q&R"],
             value="Tous",
             label="Source",
-            scale=1,
         )
-
-    search_btn = gr.Button("🔍 Rechercher", variant="primary")
-
-    with gr.Accordion("Filtres avancés", open=False):
         with gr.Row():
-            date_from = gr.Slider(minimum=2000, maximum=2026, step=1, value=2000, label="Année depuis")
-            date_to   = gr.Slider(minimum=2000, maximum=2026, step=1, value=2026, label="Année jusqu'à")
+            date_from = gr.Slider(minimum=2000, maximum=2026, step=1, value=2000, label="Depuis")
+            date_to   = gr.Slider(minimum=2000, maximum=2026, step=1, value=2026, label="Jusqu'a")
         with gr.Row():
             juris_filter = gr.Dropdown(
                 choices=["Tous", "Cour de cassation", "Cour d'appel"],
                 value="Tous",
-                label="Juridiction",
+                label="Tribunal",
             )
             code_filter = gr.Dropdown(
                 choices=["Tous"] + _code_names,
@@ -175,12 +303,15 @@ with gr.Blocks(
             min_filter = gr.Dropdown(
                 choices=["Tous"] + _ministeres,
                 value="Tous",
-                label="Ministère",
+                label="Ministere",
             )
 
-    synthesis_out = gr.HTML(label="Synthèse")
-    results_out   = gr.HTML(label="Résultats")
+    # ── Results ──
+    gr.HTML('<div style="height:8px"></div>')
+    synthesis_out = gr.HTML(label="Synthese")
+    results_out   = gr.HTML(label="Resultats")
 
+    # ── Event handlers ──
     search_btn.click(
         fn=run_search,
         inputs=[query_box, source_selector, date_from, date_to,

@@ -1,0 +1,34 @@
+{
+  "generated": "2026-03-21",
+  "dataset": "ArthurSrz/open_codes",
+  "overall_coverage_pct": 0.71,
+  "total_hf_rows": 1248,
+  "total_ground_truth": 175587,
+  "total_gap": 174339,
+  "sources": {
+    "code_articles": {
+      "hf_rows": 200,
+      "ground_truth": 42943,
+      "coverage_pct": 0.47,
+      "gap": 42743
+    },
+    "jurisprudence": {
+      "hf_rows": 489,
+      "ground_truth": 82000,
+      "coverage_pct": 0.6,
+      "gap": 81511
+    },
+    "circulaires": {
+      "hf_rows": 100,
+      "ground_truth": 10644,
+      "coverage_pct": 0.94,
+      "gap": 10544
+    },
+    "reponses_legis": {
+      "hf_rows": 459,
+      "ground_truth": 40000,
+      "coverage_pct": 1.15,
+      "gap": 39541
+    }
+  }
+}
